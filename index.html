@@ -1,11 +1,23 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+        <meta name="viewport" content="initial-scale=1.0">
         <meta charset="utf-8">
         <title>Alberta Oil and Gas Incidents 1975 - 2013</title>
         <link rel="stylesheet" href="//code.jquery.com/ui/1.10.4/themes/smoothness/jquery-ui.css">
-        <link href="/spills/default.css" rel="stylesheet">
+        <link href="default.css" rel="stylesheet">
+        <!-- Google Analytics -->
+	<script>
+	  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+	
+	  ga('create', 'UA-51737914-1', 'x10.mx');
+	  ga('send', 'pageview');
+	
+	</script>
+	<!-- End Google Analytics -->
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
         <script src="//code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
         <script type="text/javascript"
@@ -269,7 +281,7 @@
                                 position: null,
                                 icon: 'spotlight-poi.png',
                                 map: map,
-                                spillID: null
+                                ATSLocation: ""
                         });
             var spillLocations;
             
@@ -288,8 +300,6 @@
             
                 makeGetSpillsEvent();
             }
-    
-    
     
             function makeGetSpillsEvent(){
                 google.maps.event.addListener(map, 'idle', function() { getSpills();} );  
@@ -327,22 +337,26 @@
             function plotSpills(spillLocations){
                 map.clearMarkers(markers);
                 markers = [];
+                alreadyMapped = []; //An array to keep track of already populated ATS legal subdivisions
                 markers.push(selectedMarker);
+                alreadyMapped.push(selectedMarker.ATSLocation);
                 //Stick those markers into the map canvas
                 for (var i = 0; i < spillLocations.length; i++) {
-                    //Dont duplicate the selected marker.
-                    if (selectedMarker.spillID !==  spillLocations[i].IncidentNumber) {
+                    //Dont duplicate the selected marker or LSDs with a marker already. 
+                    if (jQuery.inArray(spillLocations[i].Location, alreadyMapped) == -1) {
+                    	alreadyMapped.push(spillLocations[i].ATSLocation);
+                    	
                         var marker = new google.maps.Marker({
                             position: new google.maps.LatLng(spillLocations[i].Latitude, spillLocations[i].Longitude),
                             icon: 'spotlight-poi.png',
                             map: map,
-                            spillID: spillLocations[i].IncidentNumber
+                            ATSLocation: spillLocations[i].Location
                         });
-                    }
-                    
-                    makeLoadSpillInfoEvent(marker);
+                        
+                        makeLoadSpillInfoEvent(marker);
             
-                    markers.push(marker);   
+                    	markers.push(marker);
+                    } 
                 } 
             }
     
@@ -354,20 +368,20 @@
                     //Set the new marker to orange
                     selectedMarker = marker;
                     selectedMarker.setIcon('spotlight-poi-orange.png');
-                    loadSpillInfo(marker.spillID);
+                    loadSpillInfo(marker.ATSLocation);
                 });
             }
             
             //A function that fetches the specific spill info and loads it into the spill-info div
-            function loadSpillInfo(spillID) {
+            function loadSpillInfo(ATSLocation) {
                 
-                var spillInfo = {}
+                var spillInfo = {};
                 
                 $.ajax({
                     async: false,
                     url : "getSpillInfo.php",
                     type: "POST",
-                    data: {'incidentnumber':spillID},
+                    data: $.extend({Location: ATSLocation}, sqlParameters), //send ATS location + filter parameters
                     dataType : "json",
                     success: function(data){
                         spillInfo = data;
@@ -380,25 +394,37 @@
                 
                 //Clear existing content
                 document.getElementById("spill-info").innerHTML = "";
-                var table = document.createElement('table');
                 
-                //Populated the new table element
-                for (var key in spillInfo) {
-                    if (spillInfo.hasOwnProperty(key)) {
-                        var row = document.createElement('tr');
-                        row.style.backgroundColor = "#ffebb8";
-                        var cell1 = row.insertCell(0);
-                        cell1.innerHTML = '<strong>'+key+'</strong>';
-                        var cell2 = row.insertCell(1);
-                        cell2.innerHTML = spillInfo[key];
-                        table.appendChild(row);
-                    }
-                }
+                //A count of the selected incidents for the user to know how many spill info tables have been loaded
+                var incidentCount = document.createElement('strong');
+                incidentCount.innerHTML = 'Number of incidents selected: '+spillInfo.length.toString()+'<br>';
+                document.getElementById("spill-info").appendChild(incidentCount);
                 
-                //Put the table into the div and open the spill info accordion section
-                document.getElementById("spill-info").appendChild(table);
-                $('#accordion').accordion("option", "active", 1);
-            }
+                //Iterate through the JSON encoded spill info objects and create a table for each
+                for (var i = 0;  i < spillInfo.length; i++){
+                	var lineBreak = document.createElement('br');
+	                var table = document.createElement('table');
+	                
+	                //Populated the new table element
+	                for (var key in spillInfo[i]) {
+	                    if (spillInfo[i].hasOwnProperty(key)) {
+	                        var row = document.createElement('tr');
+	                        row.style.backgroundColor = "#ffebb8";
+	                        var cell1 = row.insertCell(0);
+	                        cell1.innerHTML = '<strong>'+key+'</strong>';
+	                        var cell2 = row.insertCell(1);
+	                        cell2.innerHTML = spillInfo[i][key];
+	                        table.appendChild(row);
+	                    }
+	                }
+	                
+	                //Put the table into the div
+	                document.getElementById("spill-info").appendChild(lineBreak);
+	                document.getElementById("spill-info").appendChild(table);
+	        }
+	        //Open the spill info accordion section
+	        $('#accordion').accordion("option", "active", 1);
+	    }
         
     
             //A customized clearOverlays function to remove the defunct markers but keep the selected one.
@@ -424,7 +450,7 @@
                 </br>
                 <p>
                     Learn more about this project at:
-                    <a href="http://everettsprojects.com/2014/06/07/mapping-oil-and-gas-incidents-in-alberta-with-google-maps-jquery-and-php/" target="blank">everettsprojects.com</a>
+                    <a href="http://everettsprojects.com/2014/06/25/mapping-oil-and-gas-incidents-in-alberta-improvements/" target="blank">everettsprojects.com</a>
                 </p>
             </div>
             <div id="accordion">
@@ -456,7 +482,7 @@
                     <p>
                         <div class="ui-widget">
                             <label for="licensee-selector">Company: </label>
-                            <input id="licensee-selector" size="29" class="orange-text">  <span style="float:right;">[<a href=# id="licensee-clear">X</a>]</span>
+                            <input id="licensee-selector" style="width:17em;" class="orange-text">  <span style="float:right;">[<a href=# id="licensee-clear">X</a>]</span>
                             <br>
                         </div>
                     </p>
@@ -488,11 +514,12 @@
             <div class="text-block"> 
                 <p>
                     <a href="#" id="disclaimer-opener">Disclaimer</a> -  
-                    <a href="#" id="license-opener">Copyright (c) 2014 Everett Robinson</a>
+                    <a href="#" id="license-opener">Copyright (c) 2014 Everett Robinson</a> - 
+		    <a href="http://everettsprojects.com/2014/06/25/mapping-oil-and-gas-incidents-in-alberta-improvements/">ver.2</a>
                 </p>
             </div>
         </div>
-        <div id="disclaimer" title="Disclaimer:" style="font-size:75%;">
+        <div id="disclaimer" title="Disclaimer:" style="font-size:0.75em;">
             <p>
                 I do not under any circumstances guarantee the accuracy or truthfulness of the provided information. Furthermore, this project should not be taken as representative of the former ERCB, AER, or any other applicable parties.
                 <br>
@@ -503,7 +530,7 @@
                 Any spills originating from trans-provincial or trans-national pipelines are not included, since they do not fall under the jursdiction of the AER. Furthermore, many spills under 2 m<sup>3</sup> that did not originate from a pipeline may be absent, as they are not required to be reported.
             </p>
         </div>
-        <div id="license" title="MIT License:" style="font-size:75%;">
+        <div id="license" title="MIT License:" style="font-size:0.75em;">
             <p>
                 Copyright (c) 2014 Everett Robinson
             </p>
@@ -530,7 +557,7 @@ THE SOFTWARE.
 
             </p>
         </div>
-        <div id="no-data" class="noTitleDialog" style="font-size:75%;">
+        <div id="no-data" class="noTitleDialog" style="font-size:0.75em;">
             <p>
                 Oops, the spill locations or data couldn't be loaded right now.
             </p>

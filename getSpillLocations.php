@@ -22,7 +22,7 @@ $datemax = $yearmax."-12-31";
 $db = new PDO("mysql:host=$dbhost;dbname=$dbname",$dbuser,$dbpass);
 
 //Start building the statement with the base of the query
-$stmtString = "SELECT `IncidentNumber`, `Latitude`, `Longitude` FROM `Spills` WHERE (((`Longitude` BETWEEN :longMin AND :longMax) AND (`Latitude` BETWEEN :latMin AND :latMax) AND (`IncidentDate` BETWEEN :dateMin AND :dateMax) AND (`Volume Released` BETWEEN :volumeMin AND :volumeMax))";
+$stmtString = "SELECT DISTINCT(`Location`), `Latitude`, `Longitude` FROM `Spills` WHERE (((`Longitude` BETWEEN :longMin AND :longMax) AND (`Latitude` BETWEEN :latMin AND :latMax) AND (`IncidentDate` BETWEEN :dateMin AND :dateMax) AND (`Volume Released` BETWEEN :volumeMin AND :volumeMax))";
 
 //Add in the filters if they're set
 if ($currentlicensee !== "All") { 
