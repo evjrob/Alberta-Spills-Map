@@ -7,37 +7,60 @@
         <link rel="stylesheet" href="//code.jquery.com/ui/1.10.4/themes/smoothness/jquery-ui.css">
         <link href="default.css" rel="stylesheet">
         <!-- Google Analytics -->
-	<script>
-	  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-	  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-	  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-	  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-	
-	  ga('create', 'UA-51737914-1', 'x10.mx');
-	  ga('send', 'pageview');
-	
-	</script>
-	<!-- End Google Analytics -->
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+    
+      ga('create', 'UA-51737914-1', 'x10.mx');
+      ga('send', 'pageview');
+    
+    </script>
+    <!-- End Google Analytics -->
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
         <script src="//code.jquery.com/ui/1.10.4/jquery-ui.js"></script>
         <script type="text/javascript"
             src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCIxpXOSPJWNG7TnhMYq-Q2hPcM7zEQs8g&sensor=false">
         </script>
         <script>
+            // Fetch the parameters from the Database to populate the filters
+            var filterParameters = {};
+            
+            $.ajax({
+                async: false,
+                url : "getFilterParameters.php",
+                dataType : "json",
+                success: function(data){
+                    filterParameters = data;
+                },
+                error: function (data)
+                {
+                    alert("Couldn't retrieve the data for the filters. A page refresh will usually fix this.");
+                }
+            });
+            
             //Make a bunch of variables to track the filters and map boundaries
             var sqlParameters = {
                 currentSubstance : 'All',
                 currentSource : 'All',
-                currentLicensee: 'All',
-                yearMin : 1975,
-                yearMax : 2013,
+                currentLicensee : 'All',
+                currentFailure : 'All',
+                yearMin : filterParameters['dates'][0],
+                yearMax : filterParameters['dates'][1],
                 volumeMin : 0,
-                volumeMax : 37000000,
+                volumeMax : filterParameters['volume'][0],
+                injuryMin : 0,
+                injuryMax : filterParameters['injuryCount'][0],
+                fatalityMin : 0,
+                fatalityMax : filterParameters['fatalityCount'][0],
                 latMin : 0,
                 latMax : 0,
                 lngMin : 0,
                 lngMax : 0 
             }
+            
+                 
     
             /////////////////////////////////////
             //Nice control widgets from jQueryUI:
@@ -78,8 +101,8 @@
                 });
             });
     
-            //Sliders
-            $(function () {
+            // A function to build the sliders when we are ready to do so
+            function makeSliders() {
                 $(".slider").each(function () {
                     var begin = $(this).data("begin"),
                         end = $(this).data("end"),
@@ -101,16 +124,22 @@
                         },
                         //When the slider changes, update the displayed spills
                         change: function(event, ui) {
-                            if ($(this).attr("id") == "years") {
+                            if ($(this).attr("id") == "yearBounds") {
                                 sqlParameters.yearMin = ui.values[0];
                                 sqlParameters.yearMax = ui.values[1];
                             } else if ($(this).attr("id") == "volume") {
                                 sqlParameters.volumeMin = ui.values[0];
                                 sqlParameters.volumeMax = ui.values[1];
+                            } else if ($(this).attr("id") == "injuries") {
+                                sqlParameters.injuryMin = ui.values[0];
+                                sqlParameters.injuryMaxMax = ui.values[1];
+                            } else if ($(this).attr("id") == "fatalities") {
+                                sqlParameters.fatalityMin = ui.values[0];
+                                sqlParameters.fatalityMax = ui.values[1];
                             }
                             getSpills();
                         }
-                    })
+                    });
     
                     //Initialize the text box quantity
                     var sliderlow = ("#" + $(this).attr("id") + "_amount_low");
@@ -118,7 +147,7 @@
                     
                     var sliderhigh = ("#" + $(this).attr("id") + "_amount_high");
                     $(sliderhigh).val($(this).slider("values", 1));
-                })
+                
     
                 //When the text box is changed, update the slider
                 $('.amount1').change(function () {
@@ -131,8 +160,9 @@
                     selector = $("#" + this.id.split('_')[0]);
                     selector.slider("values", 1, value);
                 })
-            });
-
+            })}
+            
+           
             //Accordian divs
             $(function() {
                 $( "#accordion" ).accordion({   
@@ -143,19 +173,7 @@
             });
             
             //Get the Licensee list for the autocomplete widget
-            var licenseeList = [];
-            $.ajax({
-                async: false,
-                url : "getLicensees.php",
-                dataType : "json",
-                success: function(data){
-                    licenseeList = data;
-                },
-                error: function (data)
-                {
-                    alert("Couldn't retrieve the licensee list. A page refresh will usually fix this.");
-                }
-            });
+            var licenseeList = filterParameters['licensees'];
             
             //Auto Complete Licensee Selector
             $(function() {
@@ -179,54 +197,56 @@
     
             //Drop down menus
             $(function() {
-                $( "#substance-menu, #source-menu" ).menu();
+                $( "#substance-menu, #source-menu, #failure-menu" ).menu();
             });  
     
-            //When the DOM is loaded, we want to configure stuff like the menus
+            //When the DOM is loaded, we want to configure stuff like the menus and sliders
             $( document ).ready(function() {
+                //The menus
                 makeMenus();
-                
+               
+                //Set the parameters for each slider, then build them all
+                $( "#yearBounds" ).data("begin", parseInt(filterParameters['dates'][0],10)); //parseInt since it hates the normal value for some reason
+                $( "#yearBounds" ).data("end", parseInt(filterParameters['dates'][1],10));
+                $( "#yearBounds" ).data("step", 1);
+            
+                $( "#volume" ).data("begin", 0);
+                $( "#volume" ).data("end", parseInt(filterParameters['volume'][0]));
+                $( "#volume" ).data("step", 1000);
+            
+                $( "#injuries" ).data("begin", 0);
+                $( "#injuries" ).data("end", parseInt(filterParameters['injuryCount'][0]));
+                $( "#injuries" ).data("step", 1);
+            
+                $( "#fatalities" ).data("begin", 0);
+                $( "#fatalities" ).data("end", parseInt(filterParameters['fatalityCount'][0]));
+                $( "#fatalities" ).data("step", 1);
+                makeSliders();               
+       
                 //A hackish way to set the spill-info content max height based on window height
                 document.getElementById("spill-info").style.maxHeight = $(window).height()*0.40 + "px";
                 
             });
+            
+            
     
-            //Build the menus after the window has loaded (This is called at the end of <body>)
+            //Build the menus after the window has loaded
             function makeMenus() {
 
                 //Get the substances and sources for the filter menus
-                var substanceList = [];
-                $.ajax({
-                    async: false,
-                    url : "getSubstances.php",
-                    dataType : "json",
-                    success: function(data){
-                        substanceList = data;
-                        //replace the initial null element
-                        substanceList[0] = "All";
-                    },
-                    error: function (data)
-                    {
-                        alert("Couldn't retrieve the substance list. A page refresh will usually fix this.");
-                    }
-                });
+                var substanceList = filterParameters["substances"];
+                //replace the initial null element
+                substanceList[0] = "All";
+        
+                //The Sources too
+                var sourceList = filterParameters['sources'];
+                //replace the initial null element
+                sourceList[0] = "All";
                 
-                //And the Sources too
-                var sourceList = [];
-                $.ajax({
-                    async: false,
-                    url : "getSources.php",
-                    dataType : "json",
-                    success: function(data){
-                        sourceList = data;
-                        //replace the initial null element
-                        sourceList[0] = "All";
-                    },
-                    error: function (data)
-                    {
-                        alert("Couldn't retrieve the source list. A page refresh will usually fix this.");
-                    }
-                });
+                //And the Failure Types
+                var failureList = filterParameters['failureTypes'];
+                //replace the initial null element
+                failureList[0] = "All";
                 
                 //Build the lists using the database results
                 //Function courtesy of http://stackoverflow.com/questions/11128700/create-a-ul-and-fill-it-based-on-a-passed-array
@@ -256,6 +276,7 @@
                 }
                 constructLI("substance-links", substanceList);
                 constructLI("source-links", sourceList);
+                constructLI("failure-links", failureList);
             }
     
             
@@ -266,6 +287,8 @@
                     sqlParameters.currentSubstance = text;
                 } else if (domID == "source-selected") {
                     sqlParameters.currentSource = text;
+                } else if (domID == "failure-selected") {
+                    sqlParameters.currentFailure = text;
                 }
                 getSpills();
             };
@@ -344,8 +367,8 @@
                 for (var i = 0; i < spillLocations.length; i++) {
                     //Dont duplicate the selected marker or LSDs with a marker already. 
                     if (jQuery.inArray(spillLocations[i].Location, alreadyMapped) == -1) {
-                    	alreadyMapped.push(spillLocations[i].ATSLocation);
-                    	
+                        alreadyMapped.push(spillLocations[i].ATSLocation);
+                        
                         var marker = new google.maps.Marker({
                             position: new google.maps.LatLng(spillLocations[i].Latitude, spillLocations[i].Longitude),
                             icon: 'spotlight-poi.png',
@@ -355,7 +378,7 @@
                         
                         makeLoadSpillInfoEvent(marker);
             
-                    	markers.push(marker);
+                        markers.push(marker);
                     } 
                 } 
             }
@@ -402,29 +425,29 @@
                 
                 //Iterate through the JSON encoded spill info objects and create a table for each
                 for (var i = 0;  i < spillInfo.length; i++){
-                	var lineBreak = document.createElement('br');
-	                var table = document.createElement('table');
-	                
-	                //Populated the new table element
-	                for (var key in spillInfo[i]) {
-	                    if (spillInfo[i].hasOwnProperty(key)) {
-	                        var row = document.createElement('tr');
-	                        row.style.backgroundColor = "#ffebb8";
-	                        var cell1 = row.insertCell(0);
-	                        cell1.innerHTML = '<strong>'+key+'</strong>';
-	                        var cell2 = row.insertCell(1);
-	                        cell2.innerHTML = spillInfo[i][key];
-	                        table.appendChild(row);
-	                    }
-	                }
-	                
-	                //Put the table into the div
-	                document.getElementById("spill-info").appendChild(lineBreak);
-	                document.getElementById("spill-info").appendChild(table);
-	        }
-	        //Open the spill info accordion section
-	        $('#accordion').accordion("option", "active", 1);
-	    }
+                    var lineBreak = document.createElement('br');
+                    var table = document.createElement('table');
+                    
+                    //Populated the new table element
+                    for (var key in spillInfo[i]) {
+                        if (spillInfo[i].hasOwnProperty(key)) {
+                            var row = document.createElement('tr');
+                            row.style.backgroundColor = "#ffebb8";
+                            var cell1 = row.insertCell(0);
+                            cell1.innerHTML = '<strong>'+key+'</strong>';
+                            var cell2 = row.insertCell(1);
+                            cell2.innerHTML = spillInfo[i][key];
+                            table.appendChild(row);
+                        }
+                    }
+                    
+                    //Put the table into the div
+                    document.getElementById("spill-info").appendChild(lineBreak);
+                    document.getElementById("spill-info").appendChild(table);
+            }
+            //Open the spill info accordion section
+            $('#accordion').accordion("option", "active", 1);
+        }
         
     
             //A customized clearOverlays function to remove the defunct markers but keep the selected one.
@@ -442,8 +465,8 @@
         <div id="map-canvas" style="width:100%;height:100%;"></div>
         <div id="info-panel" style="text-align:left;">
             <div class="text-block">
-                <h3>Alberta Oil and Gas Incidents 1975 - 2013</h3>
-                This is a map that interactively graphs all of the Oil and Gas related spills in alberta between the years 1975 and 2013. It is based on the data acquired by <a href="http://globalnews.ca/news/622513/open-data-alberta-oil-spills-1975-2013/" target="blank">Global News</a> from the <a href="http://en.wikipedia.org/wiki/Energy_Resources_Conservation_Board" target="blank">ERCB</a> (now the <a href="http://www.aer.ca/" target="blank">AER</a>).
+                <h3>Alberta Oil and Gas Incidents 1944 - 2013</h3>
+                This is a map that interactively graphs all of the recorded Oil and Gas related spills in alberta between the years 1944 and 2013. It is based on the data acquired by <a href="http://globalnews.ca/news/622513/open-data-alberta-oil-spills-1975-2013/" target="blank">Global News</a> from the <a href="http://en.wikipedia.org/wiki/Energy_Resources_Conservation_Board" target="blank">ERCB</a> (now the <a href="http://www.aer.ca/" target="blank">AER</a>).
                 </br>
                 </br>
                 For optimal loading speeds and a clean map, it caps the number of incidents displayed to the 100 biggest spills (by volume in m<sup>3</sup>) in the current map area. Try zooming in to see more spills, or play with the provided filters to see more incidents.
@@ -459,13 +482,12 @@
                     <p>
                         <label for="amount">Years:</label>
                         <span style="float:right;">
-                            <input type="text" class="amount1" id="years_amount_low"  size="4">
+                            <input type="text" class="amount1" id="yearBounds_amount_low"  size="4">
                             <span class="orange-text"> - </span>  
-                            <input type="text" class="amount2" id="years_amount_high" size="4">
+                            <input type="text" class="amount2" id="yearBounds_amount_high" size="4">
                         </span>
                     </p>
-                
-                    <div class="slider" id="years" data-begin="1975" data-end="2013" data-step="1"> </div>
+                    <div class="slider" id="yearBounds"> </div>
             
                     <p>
                         <label for="amount">Volume:</label>
@@ -477,7 +499,29 @@
                         </span>
                     </p>
                     
-                    <div class="slider" id="volume" data-begin="0" data-end="37000000" data-step="1000"> </div>
+                    <div class="slider" id="volume"> </div>
+                    
+                    <p>
+                        <label for="amount">Injuries:</label>
+                        <span style="float:right;">
+                            <input type="text" class="amount1" id="injuries_amount_low" size="2">
+                            <span class="orange-text"> - </span>
+                            <input type="text" class="amount2" id="injuries_amount_high" size="2">
+                        </span>
+                    </p>
+                    
+                    <div class="slider" id="injuries"> </div>
+                    
+                    <p>
+                        <label for="amount">Fatalities:</label>
+                        <span style="float:right;">
+                            <input type="text" class="amount1" id="fatalities_amount_low" size="2">
+                            <span class="orange-text"> - </span>
+                            <input type="text" class="amount2" id="fatalities_amount_high" size="2">
+                        </span>
+                    </p>
+                    
+                    <div class="slider" id="fatalities"> </div>
                     <br>
                     <p>
                         <div class="ui-widget">
@@ -486,6 +530,7 @@
                             <br>
                         </div>
                     </p>
+                    
                     
                     <p>
                         <ul id="substance-menu">
@@ -505,6 +550,15 @@
                             </li>
                         </ul>
                     </p>
+                    <p>
+                        <ul id="failure-menu">
+                            <li><a href="#">Failure Type: <span id="failure-selected" class="orange-text">All</span></a>
+                                <ul id="failure-links">
+
+                                </ul>
+                            </li>
+                        </ul>
+                    </p>
                 </div>
                 <h3>Incident Details</h3>
                 <div id="spill-info">
@@ -515,7 +569,7 @@
                 <p>
                     <a href="#" id="disclaimer-opener">Disclaimer</a> -  
                     <a href="#" id="license-opener">Copyright (c) 2014 Everett Robinson</a> - 
-		    <a href="http://everettsprojects.com/2014/06/25/mapping-oil-and-gas-incidents-in-alberta-improvements/">ver.2</a>
+            <a href="https://github.com/evjrob/Alberta-Spills-Map/">ver.2.1</a>
                 </p>
             </div>
         </div>
