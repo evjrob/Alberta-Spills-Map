@@ -29,7 +29,7 @@
             
             $.ajax({
                 async: false,
-                url : "getFilterParameters.php",
+                url : "filters.json",
                 dataType : "json",
                 success: function(data){
                     filterParameters = data;
@@ -42,10 +42,10 @@
             
             //Make a bunch of variables to track the filters and map boundaries
             var sqlParameters = {
-                currentSubstance : 'All',
-                currentSource : 'All',
-                currentLicensee : 'All',
-                currentFailure : 'All',
+                currentSubstance : "All",
+                currentSource : "All",
+                currentLicensee : "All",
+                currentFailure : "All",
                 yearMin : filterParameters['dates'][0],
                 yearMax : filterParameters['dates'][1],
                 volumeMin : 0,
@@ -342,12 +342,13 @@
                     
                 //Get the spill location data
                 $.ajax({
-                    url : "getSpillLocations.php",
+                    url : "https://d3cwzjnawb.execute-api.us-east-1.amazonaws.com/everettsprojects-production",
                     type: "POST",
-                    data : sqlParameters,
+                    data : JSON.stringify(sqlParameters),
                     dataType : "json",
                     success: function(data){
-                        SpillLocations = data;  
+                        var result = JSON.parse(data);
+                        SpillLocations = result.body;  
                         plotSpills(SpillLocations);
                     },
                     error: function (data)
@@ -358,6 +359,7 @@
             }
     
             function plotSpills(spillLocations){
+                
                 map.clearMarkers(markers);
                 markers = [];
                 alreadyMapped = []; //An array to keep track of already populated ATS legal subdivisions
@@ -365,7 +367,7 @@
                 alreadyMapped.push(selectedMarker.ATSLocation);
                 //Stick those markers into the map canvas
                 for (var i = 0; i < spillLocations.length; i++) {
-                    //Dont duplicate the selected marker or LSDs with a marker already. 
+                    //Dont duplicate the selected marker or LSDs with a marker already.
                     if (jQuery.inArray(spillLocations[i].Location, alreadyMapped) == -1) {
                         alreadyMapped.push(spillLocations[i].ATSLocation);
                         
@@ -402,12 +404,13 @@
                 
                 $.ajax({
                     async: false,
-                    url : "getSpillInfo.php",
+                    url : "https://x8kjzlgzz1.execute-api.us-east-1.amazonaws.com/everettsprojects-production",
                     type: "POST",
-                    data: $.extend({Location: ATSLocation}, sqlParameters), //send ATS location + filter parameters
+                    data: JSON.stringify($.extend({Location: ATSLocation}, sqlParameters)), //send ATS location + filter parameters
                     dataType : "json",
                     success: function(data){
-                        spillInfo = data;
+                        var result = JSON.parse(data);
+                        spillInfo = result.body;
                     },
                     error: function (data)
                     {

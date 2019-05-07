@@ -72,11 +72,18 @@ ul.ui-autocomplete {
 
 }
 
-#substance-links, #source-links, #failure-links {
+#substance-links {
   overflow: auto;
   width: 200px;
-  max-height: 175px;
-  z-index: 1000;
+  max-height: 200px;
+  z-index: 1;
+}
+
+#source-links {
+  overflow: auto;
+  width: 200px;
+  max-height: 200px;
+  z-index: 1;
 }
 
 .orange-text {
