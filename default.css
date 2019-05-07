@@ -26,8 +26,8 @@ html, body {
   max-height: 96%;
   position: absolute;
   font-size: 0.75em;
-  top: 10px;
-  left: 90px;
+  top: 90px;
+  left: 10px;
   background-color: #fff;
   padding: 2px;
   border: 1px solid #999;
